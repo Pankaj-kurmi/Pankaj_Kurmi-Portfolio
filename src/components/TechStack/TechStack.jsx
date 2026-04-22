@@ -58,6 +58,12 @@ export default function TechStack() {
       zGap: 800,
       radiusX: 400,
       radiusY: 300,
+      scrollDistance: 9000,
+      velocityMultiplier: 0.0008,
+      positionLerp: 0.05,
+      velocityLerp: 0.08,
+      introStagger: 0.22,
+      introDuration: 0.9,
     };
 
     const items = [];
@@ -99,11 +105,12 @@ export default function TechStack() {
       worldEl.appendChild(el);
 
       items.push({
-  el,
-  x: 0,           
-  y: 0,           
-  baseZ: -idx * CONFIG.zGap,  
-});
+        el,
+        x: 0,
+        y: 0,
+        baseZ: -idx * CONFIG.zGap,
+        introDelay: idx * CONFIG.introStagger,
+      });
 
       idx++;
     });
@@ -131,27 +138,33 @@ export default function TechStack() {
     const scrollTrigger = ScrollTrigger.create({
       trigger: sectionEl,
       start: "top top",
-      end: "+=5000",
+      end: `+=${CONFIG.scrollDistance}`,
       scrub: true,
       pin: true,
       onUpdate: (self) => {
         target = self.progress * (techStack.length * CONFIG.zGap);
-        velocity.target = self.getVelocity() * 0.002;
+        velocity.target = self.getVelocity() * CONFIG.velocityMultiplier;
       },
     });
 
     
     const render = () => {
-      current += (target - current) * 0.08;
-      velocity.v += (velocity.target - velocity.v) * 0.12;
+      current += (target - current) * CONFIG.positionLerp;
+      velocity.v += (velocity.target - velocity.v) * CONFIG.velocityLerp;
+      const elapsed = gsap.ticker.time;
 
       items.forEach((item, i) => {
         const z = item.baseZ + current;
 
         const float = Math.sin(gsap.ticker.time + i) * 8;
         const scale = 1 - Math.min(Math.abs(z) / 4000, 0.5);
+        const introProgress = gsap.utils.clamp(
+          0,
+          1,
+          (elapsed - item.introDelay) / CONFIG.introDuration
+        );
 
-        const blur = Math.min(Math.abs(velocity.v) * 50, 12);
+        const blur = Math.min(Math.abs(velocity.v) * 32, 8);
         let opacity = 1;
 
 if (z > 300) opacity = 0;
@@ -160,12 +173,14 @@ else if (z < -1000) opacity = 0;
 else if (z < -300) opacity = 1 + z / 1000;
 
 opacity = Math.max(0, Math.min(1, opacity));
+        opacity *= introProgress;
+        const introScale = gsap.utils.interpolate(0.9, 1, introProgress);
 
         item.el.style.transform = `
           translate3d(${item.x}px, ${item.y + float}px, ${z}px)
           translate(-50%, -50%)
           rotateY(${float * 2}deg)
-          scale(${scale})
+          scale(${scale * introScale})
         `;
 
         item.el.style.filter = `blur(${blur}px)`;
